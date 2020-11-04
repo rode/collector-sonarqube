@@ -38,6 +38,35 @@ type WebhookResponseList struct {
 	Webhooks []WebhookResponse `json:"webhooks"`
 }
 
+type WebhookEvent struct {
+	TaskId      string       `json:"taskid"`
+	Status      string       `json:"status"`
+	AnalyzedAt  string       `json:"analyzedat"`
+	GitCommit   string       `json:"revision"`
+	Project     *Project     `json:"project"`
+	QualityGate *QualityGate `json:"qualityGate"`
+}
+
+type Project struct {
+	Key  string `json:"key"`
+	Name string `json:"name"`
+	Url  string `json:"url"`
+}
+
+type QualityGate struct {
+	Conditions []*Condition `json:"conditions"`
+	Name       string       `json:"name"`
+	Status     string       `json:"status"`
+}
+
+type Condition struct {
+	ErrorThreshold string `json:"errorThreshold`
+	Metric         string `json:"metric"`
+	OnLeakPeriod   string `json:"onLeakPeriod"`
+	Operator       string `json:"operator"`
+	Status         string `json:"status"`
+}
+
 // NewWebhook constructor for Webhook struct
 func NewWebhook(ctx context.Context, sonar SonarQubeClient, name string, url string, organization string, project string) Webhook {
 	if name == "" {
@@ -99,6 +128,20 @@ func (w *Webhook) Delete() {
 	}
 }
 
+// ProcessEvent handles incoming webhook events
+func (w *Webhook) ProcessEvent(writer http.ResponseWriter, request *http.Request) {
+	log.Print("Received SonarQube event")
+
+	event := &WebhookEvent{}
+	json.NewDecoder(request.Body).Decode(event)
+	log.Printf("SonarQube Event Payload: [%+v]", event)
+	log.Printf("SonarQube Event Project: [%+v]", event.Project)
+	log.Printf("SonarQube Event Quality Gate: [%+v]", event.QualityGate)
+	log.Printf("SonarQube Event Quality Gate: [%+v]", event.QualityGate.Conditions[0])
+
+	writer.WriteHeader(200)
+}
+
 // deleteBykey deletes an webhook using the specified key identifer
 func (w *Webhook) deleteByKey(key string) error {
 	client := http.Client{}
@@ -145,7 +188,7 @@ func (w *Webhook) clean() error {
 	body := &WebhookResponseList{}
 
 	if err := json.NewDecoder(response.Body).Decode(body); err != nil {
-		log.Printf("Error decoding webhook list: %s\n", err)
+		log.Printf("Error decoding webhook list: %+v\n", response)
 		return err
 	}
 	for _, webhook := range body.Webhooks {
