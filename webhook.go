@@ -188,7 +188,7 @@ func (w *Webhook) clean() error {
 	body := &WebhookResponseList{}
 
 	if err := json.NewDecoder(response.Body).Decode(body); err != nil {
-		log.Printf("Error decoding webhook list: %+v\n", response)
+		log.Printf("Error decoding webhook list: %s\n", err)
 		return err
 	}
 	for _, webhook := range body.Webhooks {
