@@ -5,6 +5,7 @@ import (
 	"flag"
 	"log"
 	"math/rand"
+	"net/http"
 	"os"
 	"time"
 )
@@ -31,8 +32,7 @@ func init() {
 	flag.StringVar(&flagSonarURL, "sonar-url", stringEnv("SONAR_URL", flagSonarURL), "URL of SonarQube host")
 	flag.StringVar(&flagSonarUsername, "sonar-username", stringEnv("SONAR_USERNAME", flagSonarUsername), "Username for SonarQube host")
 	flag.StringVar(&flagSonarPassword, "sonar-password", stringEnv("SONAR_PASSWORD", flagSonarPassword), "Password for SonarQube host")
-	flag.StringVar(&flagSonarToken, "sonar-token", os.Getenv("SONAR_USERNAME"), "Token for SonarQube host")
-
+	flag.StringVar(&flagSonarToken, "sonar-token", os.Getenv("SONAR_TOKEN"), "Token for SonarQube host")
 }
 
 func main() {
@@ -50,4 +50,9 @@ func main() {
 	wh := NewWebhook(ctx, client, "rode-collector", flagCollectorURL, "", "")
 	wh.Create()
 	defer wh.Delete()
+
+	http.HandleFunc("/webhook/event", wh.ProcessEvent)
+
+	log.Println("Listening for SonarQube events")
+	log.Fatal(http.ListenAndServe(":8080", nil))
 }
