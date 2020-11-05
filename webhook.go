@@ -10,6 +10,13 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+
+	"github.com/grafeas/grafeas/proto/v1beta1/common_go_proto"
+	"github.com/grafeas/grafeas/proto/v1beta1/grafeas_go_proto"
+	"github.com/grafeas/grafeas/proto/v1beta1/package_go_proto"
+	"github.com/grafeas/grafeas/proto/v1beta1/vulnerability_go_proto"
+	"google.golang.org/protobuf/types/known/timestamppb"
+	"liatr.io/rode-collector-sonarqube/client"
 )
 
 type Webhook struct {
@@ -139,10 +146,13 @@ func (w *Webhook) ProcessEvent(writer http.ResponseWriter, request *http.Request
 	log.Printf("SonarQube Event Quality Gate: [%+v]", event.QualityGate)
 	log.Printf("SonarQube Event Quality Gate: [%+v]", event.QualityGate.Conditions[0])
 
+	client := client.RodeClient{URL: "localhost:50051"}
+	client.SendOccurrences([]*grafeas_go_proto.Occurrence{w.createQualityGateOccurrence(event)})
+
 	writer.WriteHeader(200)
 }
 
-// deleteBykey deletes an webhook using the specified key identifer
+// deleteByKey deletes an webhook using the specified key identifer
 func (w *Webhook) deleteByKey(key string) error {
 	client := http.Client{}
 	params := url.Values{}
@@ -200,4 +210,53 @@ func (w *Webhook) clean() error {
 		}
 	}
 	return err
+}
+
+func (w *Webhook) createQualityGateOccurrence(webhook *WebhookEvent) *grafeas_go_proto.Occurrence {
+	occurrence := &grafeas_go_proto.Occurrence{
+		Name: "abc",
+		Resource: &grafeas_go_proto.Resource{
+			Name: "testResource",
+			Uri:  "test",
+		},
+		NoteName:    "projects/abc/notes/123",
+		Kind:        common_go_proto.NoteKind_VULNERABILITY,
+		Remediation: "test",
+		CreateTime:  timestamppb.Now(),
+		Details: &grafeas_go_proto.Occurrence_Vulnerability{
+			Vulnerability: &vulnerability_go_proto.Details{
+				Type:             "test",
+				Severity:         vulnerability_go_proto.Severity_CRITICAL,
+				ShortDescription: "abc",
+				LongDescription:  "abc123",
+				RelatedUrls: []*common_go_proto.RelatedUrl{
+					{
+						Url:   "test",
+						Label: "test",
+					},
+					{
+						Url:   "test",
+						Label: "test",
+					},
+				},
+				EffectiveSeverity: vulnerability_go_proto.Severity_CRITICAL,
+				PackageIssue: []*vulnerability_go_proto.PackageIssue{
+					{
+						SeverityName: "test",
+						AffectedLocation: &vulnerability_go_proto.VulnerabilityLocation{
+							CpeUri:  "test",
+							Package: "test",
+							Version: &package_go_proto.Version{
+								Name:     "test",
+								Revision: "test",
+								Epoch:    35,
+								Kind:     package_go_proto.Version_MINIMUM,
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+	return occurrence
 }
