@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"log"
 	"net/http"
 )
 
@@ -44,8 +43,7 @@ func (s *SonarQubeClient) Request(method string, path string, body io.Reader) (*
 	url := fmt.Sprintf("%s/%s", s.Url, path)
 	request, err := http.NewRequestWithContext(s.Ctx, method, url, body)
 	if err != nil {
-		log.Printf("Error creating SonarQube request (METHOD:%s, URL:%s, BODY:%s ERROR:%s)", method, url, body, err)
-		return nil, err
+		return &http.Request{}, fmt.Errorf("Error creating SonarQube request (METHOD:%s, URL:%s, BODY:%s ERROR:%s)", method, url, body, err)
 	}
 	request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	s.Auth.Inject(request)
