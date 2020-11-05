@@ -4,14 +4,17 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"log"
 	"net/http"
 )
 
 type SonarQubeClient struct {
-	ctx  context.Context
-	url  string
-	auth Auth
+	Ctx  context.Context
+	Url  string
+	Auth Auth
+}
+
+type SonarQube interface {
+	Request(method string, path string, body io.Reader) (*http.Request, error)
 }
 
 type Auth interface {
@@ -19,31 +22,30 @@ type Auth interface {
 }
 
 type AuthBasic struct {
-	username string
-	password string
+	Username string
+	Password string
 }
 
 type AuthToken struct {
-	token string
+	Token string
 }
 
 func (a *AuthBasic) Inject(request *http.Request) {
-	request.SetBasicAuth(a.username, a.username)
+	request.SetBasicAuth(a.Username, a.Password)
 }
 
 func (a *AuthToken) Inject(request *http.Request) {
-	request.SetBasicAuth(a.token, "")
+	request.SetBasicAuth(a.Token, "")
 }
 
 // Request creates an http.Request for SonarQube API
 func (s *SonarQubeClient) Request(method string, path string, body io.Reader) (*http.Request, error) {
-	url := fmt.Sprintf("%s/%s", s.url, path)
-	request, err := http.NewRequestWithContext(s.ctx, method, url, body)
+	url := fmt.Sprintf("%s/%s", s.Url, path)
+	request, err := http.NewRequestWithContext(s.Ctx, method, url, body)
 	if err != nil {
-		log.Printf("Error creating SonarQube request (METHOD:%s, URL:%s, BODY:%s ERROR:%s)", method, url, body, err)
-		return nil, err
+		return &http.Request{}, fmt.Errorf("Error creating SonarQube request (METHOD:%s, URL:%s, BODY:%s ERROR:%s)", method, url, body, err)
 	}
 	request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	s.auth.Inject(request)
+	s.Auth.Inject(request)
 	return request, nil
 }

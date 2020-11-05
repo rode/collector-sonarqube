@@ -40,14 +40,18 @@ func main() {
 	ctx := context.Background()
 	var auth Auth
 	if flagSonarToken != "" {
-		auth = &AuthToken{token: flagSonarToken}
+		auth = &AuthToken{Token: flagSonarToken}
 	} else if flagSonarUsername != "" && flagSonarPassword != "" {
-		auth = &AuthBasic{username: flagSonarUsername, password: flagSonarPassword}
+		auth = &AuthBasic{Username: flagSonarUsername, Password: flagSonarPassword}
 	} else {
 		log.Fatal("Must include SonarQube username and password or token")
 	}
-	client := SonarQubeClient{ctx: ctx, url: flagSonarURL, auth: auth}
-	wh := NewWebhook(ctx, client, "rode-collector", flagCollectorURL, "", "")
+	client := &SonarQubeClient{Ctx: ctx, Url: flagSonarURL, Auth: auth}
+	wh, err := NewWebhook(ctx, client, "rode-collector", flagCollectorURL, "", "")
+	if err != nil {
+		log.Fatal("Exiting due to error...")
+	}
+
 	wh.Create()
 	defer wh.Delete()
 
