@@ -116,10 +116,12 @@ func (w *Webhook) Create() error {
 	if err != nil {
 		return fmt.Errorf("Error creating webhook request: %s", err)
 	}
-	response, _ := client.Do(request)
-	if response.StatusCode != 200 {
-		return fmt.Errorf("Error creating SonarQube webhook: Status Code [%d]", response.StatusCode)
+	response, err := client.Do(request)
+	err = checkResponse(response, err, 200)
+	if err != nil {
+		return err
 	}
+
 	var responseBody = &WebhookResponseItem{}
 	if err := json.NewDecoder(response.Body).Decode(responseBody); err != nil {
 		return fmt.Errorf("Error decoding create webhook response: %s", err)
@@ -131,11 +133,13 @@ func (w *Webhook) Create() error {
 }
 
 // Delete deletes rode-collector webhook using existing object key
-func (w *Webhook) Delete() {
+func (w *Webhook) Delete() error {
 	err := w.deleteByKey(w.Key)
 	if err != nil {
-		log.Fatalf("Error deleting webhook: %s", err)
+		return fmt.Errorf("Error deleting webhook: %s", err)
 	}
+
+	return nil
 }
 
 // ProcessEvent handles incoming webhook events
@@ -145,9 +149,6 @@ func (w *Webhook) ProcessEvent(writer http.ResponseWriter, request *http.Request
 	event := &WebhookEvent{}
 	json.NewDecoder(request.Body).Decode(event)
 	log.Printf("SonarQube Event Payload: [%+v]", event)
-	log.Printf("SonarQube Event Project: [%+v]", event.Project)
-	log.Printf("SonarQube Event Quality Gate: [%+v]", event.QualityGate)
-	log.Printf("SonarQube Event Quality Gate: [%+v]", event.QualityGate.Conditions[0])
 
 	writer.WriteHeader(200)
 }
@@ -159,14 +160,15 @@ func (w *Webhook) deleteByKey(key string) error {
 	params.Add("webhook", key)
 	request, err := w.Sonar.Request("POST", "api/webhooks/delete", strings.NewReader(params.Encode()))
 	if err != nil {
-		log.Printf("Error createing delete webhook request: %s", err)
-		return err
+		return fmt.Errorf("Error createing delete webhook request: %s", err)
 	}
-	_, err = client.Do(request)
+
+	resp, err := client.Do(request)
+	err = checkResponse(resp, err, 201)
 	if err != nil {
-		log.Printf("Error deleting webhook: %s", err)
 		return err
 	}
+
 	return nil
 }
 
@@ -194,14 +196,15 @@ func (w *Webhook) clean() error {
 	}
 
 	response, err := client.Do(request)
+	err = checkResponse(response, err, 200)
 	if err != nil {
-		log.Printf("Error fetching webhooks from SonarQube: %s", err)
+		return err
 	}
 
 	body := &WebhookResponseList{}
 	if err := json.NewDecoder(response.Body).Decode(body); err != nil {
-		log.Printf("Error decoding webhook list: %s\n", err)
-		return err
+
+		return fmt.Errorf("Error decoding webhook list: %+v", response)
 	}
 
 	for _, webhook := range body.Webhooks {
@@ -213,5 +216,17 @@ func (w *Webhook) clean() error {
 		}
 	}
 
-	return err
+	return nil
+}
+
+func checkResponse(resp *http.Response, err error, okStatusCode int) error {
+	if err != nil {
+		return fmt.Errorf("Failed to make request: [%s]", err)
+	}
+
+	if resp.StatusCode != okStatusCode {
+		return fmt.Errorf("Unexpected response: [%d]", resp.StatusCode)
+	}
+
+	return nil
 }
