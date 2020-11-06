@@ -25,6 +25,6 @@ jobs:
       
       - uses: ./.github/workflows/skaffold
         with:
-          registry: ghcr.io
+          registry: ghcr.io/liatrio
           username: ${{ secrets.CR_USER }}
           password: ${{ secrets.CR_PAT }}
