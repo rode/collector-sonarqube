@@ -2,6 +2,6 @@ apiVersion: skaffold/v2alpha1
 kind: Config
 build:
   artifacts:
-  - image: ghcr.io/liatrio/rode-collector-sonarqube
+  - image: rode-collector-sonarqube
   local:
     useBuildkit: true
