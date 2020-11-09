@@ -1,10 +1,20 @@
 package listener
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
+	"time"
+
+	"github.com/grafeas/grafeas/proto/v1beta1/common_go_proto"
+	"github.com/grafeas/grafeas/proto/v1beta1/grafeas_go_proto"
+	"github.com/grafeas/grafeas/proto/v1beta1/package_go_proto"
+	"github.com/grafeas/grafeas/proto/v1beta1/vulnerability_go_proto"
+	pb "github.com/liatrio/rode-api/proto/v1alpha1"
+	"google.golang.org/grpc"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 // Event is...
@@ -40,6 +50,10 @@ type Condition struct {
 	Status         string `json:"status"`
 }
 
+const (
+	address = "localhost:50051"
+)
+
 // ProcessEvent handles incoming webhook events
 func ProcessEvent(w http.ResponseWriter, request *http.Request) {
 	log.Print("Received SonarQube event")
@@ -51,12 +65,80 @@ func ProcessEvent(w http.ResponseWriter, request *http.Request) {
 		return
 	}
 
+	conn, err := grpc.Dial(address, grpc.WithInsecure(), grpc.WithBlock())
+	if err != nil {
+		log.Fatalf("did not connect: %v", err)
+	}
+	defer conn.Close()
+	c := pb.NewRodeClient(conn)
+	occurrences := []*grafeas_go_proto.Occurrence{}
+
 	log.Printf("SonarQube Event Payload: [%+v]", event)
 	log.Printf("SonarQube Event Project: [%+v]", event.Project)
 	log.Printf("SonarQube Event Quality Gate: [%+v]", event.QualityGate)
 	for _, condition := range event.QualityGate.Conditions {
 		log.Printf("SonarQube Event Quality Gate Condition: [%+v]", condition)
+		occurrence := createQualityGateOccurrence(condition)
+		occurrences = append(occurrences, occurrence)
 	}
-
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	response, err := c.BatchCreateOccurrences(ctx, &grafeas_go_proto.BatchCreateOccurrencesRequest{
+		Occurrences: occurrences,
+		Parent:      "projects/test123",
+	})
+	if err != nil {
+		log.Fatalf("could not create occurrence: %v", err)
+	}
+	fmt.Printf("%#v\n", response)
 	w.WriteHeader(200)
+}
+
+func createQualityGateOccurrence(condition *Condition) *grafeas_go_proto.Occurrence {
+	occurrence := &grafeas_go_proto.Occurrence{
+		Name: condition.Metric,
+		Resource: &grafeas_go_proto.Resource{
+			Name: "testResource",
+			Uri:  "test",
+		},
+		NoteName:    "projects/abc/notes/123",
+		Kind:        common_go_proto.NoteKind_VULNERABILITY,
+		Remediation: "test",
+		CreateTime:  timestamppb.Now(),
+		Details: &grafeas_go_proto.Occurrence_Vulnerability{
+			Vulnerability: &vulnerability_go_proto.Details{
+				Type:             "test",
+				Severity:         vulnerability_go_proto.Severity_CRITICAL,
+				ShortDescription: "abc",
+				LongDescription:  "abc123",
+				RelatedUrls: []*common_go_proto.RelatedUrl{
+					{
+						Url:   "test",
+						Label: "test",
+					},
+					{
+						Url:   "test",
+						Label: "test",
+					},
+				},
+				EffectiveSeverity: vulnerability_go_proto.Severity_CRITICAL,
+				PackageIssue: []*vulnerability_go_proto.PackageIssue{
+					{
+						SeverityName: "test",
+						AffectedLocation: &vulnerability_go_proto.VulnerabilityLocation{
+							CpeUri:  "test",
+							Package: "test",
+							Version: &package_go_proto.Version{
+								Name:     "test",
+								Revision: "test",
+								Epoch:    35,
+								Kind:     package_go_proto.Version_MINIMUM,
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+	return occurrence
 }
