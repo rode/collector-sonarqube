@@ -1,0 +1,18 @@
+### [build]
+apiVersion: skaffold/v1beta12
+kind: Config
+build:
+  artifacts:
+  - image: rode-collector-sonarqube
+    docker:
+      target: builder
+  local:
+    useBuildkit: true
+    push: false
+### [build]
+profiles:
+  - name: runner
+    patches:
+      - op: replace
+        path: /build/artifacts/0/docker/target
+        value: runner
