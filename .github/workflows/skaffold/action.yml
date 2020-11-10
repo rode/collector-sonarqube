@@ -1,5 +1,5 @@
 name: Skaffold
-description: Publish image 
+description: Publish image
 branding:
   icon: upload-cloud
   color: blue
@@ -13,3 +13,4 @@ inputs:
     description: The username for accessing OCI registry
   password:
     description: The password for accessing OCI registry
+
