@@ -4,6 +4,8 @@ FROM golang:1.15-alpine as builder
 
 WORKDIR /workspace
 
+RUN apk add --no-cache gcc libc-dev
+
 # Copy the Go Modules manifests
 COPY go.mod go.sum /workspace/
 
