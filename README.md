@@ -1,5 +1,8 @@
 # Rode Collector SonarQube
 
+[![Actions Status](https://github.com/liatrio/rode-collector-sonarqube/workflows/build/badge.svg)](https://github.com/liatrio/rode-collector-sonarqube/actions)
+[![codecov](https://codecov.io/gh/liatrio/rode-collector-sonarqube/branch/main/graph/badge.svg?token=YK62AO2TNX)](https://codecov.io/gh/liatrio/rode-collector-sonarqube)
+
 [Rode Collector](https://github.com/liatrio/rode-collector-service) for SonarQube 
 
 Collects build metadata from SonarQube to be used to validate automated governance policies. When the collector starts it adds a webhook to SonarQube. It then responds to SonarQube events and sends metadata to a central [Rode Collector](https://github.com/liatrio/rode-collector-service) which stores the metadata in a Grafeas Occurrence.
