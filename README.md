@@ -1,6 +1,5 @@
 # Rode Collector SonarQube
 
-[![Actions Status](https://github.com/liatrio/rode-collector-sonarqube/workflows/build/badge.svg)](https://github.com/liatrio/rode-collector-sonarqube/actions)
 [![codecov](https://codecov.io/gh/liatrio/rode-collector-sonarqube/branch/main/graph/badge.svg?token=YK62AO2TNX)](https://codecov.io/gh/liatrio/rode-collector-sonarqube)
 
 [Rode Collector](https://github.com/liatrio/rode-collector-service) for SonarQube 
