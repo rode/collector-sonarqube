@@ -25,6 +25,15 @@ type Event struct {
 	GitCommit   string       `json:"revision"`
 	Project     *Project     `json:"project"`
 	QualityGate *QualityGate `json:"qualityGate"`
+	Branch      *Branch      `json:"branch"`
+}
+
+// Branch is...
+type Branch struct {
+	Name   string `json:"name"`
+	Type   string `json:"type"`
+	IsMain bool   `json:"isMain"`
+	Url    string `json:"url"`
 }
 
 // Project is
@@ -76,16 +85,19 @@ func ProcessEvent(w http.ResponseWriter, request *http.Request) {
 	log.Printf("SonarQube Event Payload: [%+v]", event)
 	log.Printf("SonarQube Event Project: [%+v]", event.Project)
 	log.Printf("SonarQube Event Quality Gate: [%+v]", event.QualityGate)
+
+	repo := getRepoFromSonar(event)
+
 	for _, condition := range event.QualityGate.Conditions {
 		log.Printf("SonarQube Event Quality Gate Condition: [%+v]", condition)
-		occurrence := createQualityGateOccurrence(condition)
+		occurrence := createQualityGateOccurrence(condition, repo)
 		occurrences = append(occurrences, occurrence)
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
 	response, err := c.BatchCreateOccurrences(ctx, &grafeas_go_proto.BatchCreateOccurrencesRequest{
 		Occurrences: occurrences,
-		Parent:      "projects/test123",
+		Parent:      "projects/rode", // won't need this anymore
 	})
 	if err != nil {
 		log.Fatalf("could not create occurrence: %v", err)
@@ -94,15 +106,20 @@ func ProcessEvent(w http.ResponseWriter, request *http.Request) {
 	w.WriteHeader(200)
 }
 
-func createQualityGateOccurrence(condition *Condition) *grafeas_go_proto.Occurrence {
+func getRepoFromSonar(event *Event) string {
+	repoString := fmt.Sprintf("%s:%s", event.Branch.Url, event.GitCommit)
+	return repoString
+}
+
+func createQualityGateOccurrence(condition *Condition, repo string) *grafeas_go_proto.Occurrence {
 	occurrence := &grafeas_go_proto.Occurrence{
 		Name: condition.Metric,
 		Resource: &grafeas_go_proto.Resource{
-			Name: "testResource",
-			Uri:  "test",
+			Name: repo,
+			Uri:  repo,
 		},
-		NoteName:    "projects/abc/notes/123",
-		Kind:        common_go_proto.NoteKind_VULNERABILITY,
+		NoteName:    "projects/notes_project/notes/sonarqube",
+		Kind:        common_go_proto.NoteKind_NOTE_KIND_UNSPECIFIED,
 		Remediation: "test",
 		CreateTime:  timestamppb.Now(),
 		Details: &grafeas_go_proto.Occurrence_Vulnerability{
