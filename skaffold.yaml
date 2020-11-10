@@ -5,14 +5,7 @@ build:
   artifacts:
   - image: rode-collector-sonarqube
     docker:
-      target: builder
+      target: runner
   local:
     useBuildkit: true
-    push: false
 ### [build]
-profiles:
-  - name: runner
-    patches:
-      - op: replace
-        path: /build/artifacts/0/docker/target
-        value: runner

@@ -13,7 +13,6 @@ jobs:
       - name: Deploy Artifact
         uses: ./.github/workflows/skaffold
         with:
-          skaffold_profile: runner
           registry: ghcr.io
           username: ${{ secrets.CR_USER }}
           password: ${{ secrets.CR_PAT }}

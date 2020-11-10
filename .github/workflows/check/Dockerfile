@@ -1,4 +1,6 @@
-FROM gcr.io/k8s-skaffold/skaffold:v1.3.1
+FROM golang:1.15-alpine
+
+RUN apk add --no-cache gcc libc-dev
 
 COPY "entrypoint.sh" "/entrypoint.sh"
 RUN chmod +x /entrypoint.sh
