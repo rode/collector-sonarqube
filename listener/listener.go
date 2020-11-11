@@ -19,13 +19,14 @@ import (
 
 // Event is...
 type Event struct {
-	TaskID      string       `json:"taskid"`
-	Status      string       `json:"status"`
-	AnalyzedAt  string       `json:"analyzedat"`
-	GitCommit   string       `json:"revision"`
-	Project     *Project     `json:"project"`
-	QualityGate *QualityGate `json:"qualityGate"`
-	Branch      *Branch      `json:"branch"`
+	TaskID      string            `json:"taskid"`
+	Status      string            `json:"status"`
+	AnalyzedAt  string            `json:"analyzedat"`
+	GitCommit   string            `json:"revision"`
+	Project     *Project          `json:"project"`
+	QualityGate *QualityGate      `json:"qualityGate"`
+	Branch      *Branch           `json:"branch"`
+	Properties  map[string]string `json:"properties"`
 }
 
 // Branch is...
@@ -33,7 +34,7 @@ type Branch struct {
 	Name   string `json:"name"`
 	Type   string `json:"type"`
 	IsMain bool   `json:"isMain"`
-	Url    string `json:"url"`
+	URL    string `json:"url"`
 }
 
 // Project is
@@ -107,7 +108,17 @@ func ProcessEvent(w http.ResponseWriter, request *http.Request) {
 }
 
 func getRepoFromSonar(event *Event) string {
-	repoString := fmt.Sprintf("%s:%s", event.Branch.Url, event.GitCommit)
+	/*
+		// Need to add logic to check if they are using developer or enterprise edition, but current API
+		// only exposes this to admin users. Getting the resource URI is easier in the developer edition and is
+		// not dependent on a value passed in from the project. It can be done like this:
+		if isNotCommunityEdition(){
+			repoString := fmt.Sprintf("%s:%s",event.Branch.URL,event.GitCommit)
+			return repoString
+		}
+	*/
+
+	repoString := fmt.Sprintf("%s:%s", event.Properties["sonar.analysis.resourceUriPrefix"], event.GitCommit)
 	return repoString
 }
 
@@ -122,6 +133,7 @@ func createQualityGateOccurrence(condition *Condition, repo string) *grafeas_go_
 		Kind:        common_go_proto.NoteKind_NOTE_KIND_UNSPECIFIED,
 		Remediation: "test",
 		CreateTime:  timestamppb.Now(),
+		// To be changed when a proper occurrence type is determined
 		Details: &grafeas_go_proto.Occurrence_Vulnerability{
 			Vulnerability: &vulnerability_go_proto.Details{
 				Type:             "test",
