@@ -98,7 +98,6 @@ func ProcessEvent(w http.ResponseWriter, request *http.Request) {
 	defer cancel()
 	response, err := c.BatchCreateOccurrences(ctx, &grafeas_go_proto.BatchCreateOccurrencesRequest{
 		Occurrences: occurrences,
-		Parent:      "projects/rode", // won't need this anymore
 	})
 	if err != nil {
 		log.Fatalf("could not create occurrence: %v", err)
