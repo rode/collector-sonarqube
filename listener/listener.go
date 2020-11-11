@@ -15,6 +15,7 @@ import (
 	pb "github.com/liatrio/rode-api/proto/v1alpha1"
 	"google.golang.org/grpc"
 	"google.golang.org/protobuf/types/known/timestamppb"
+	"liatr.io/rode-collector-sonarqube/config"
 )
 
 // Event is...
@@ -60,10 +61,6 @@ type Condition struct {
 	Status         string `json:"status"`
 }
 
-const (
-	address = "localhost:50051"
-)
-
 // ProcessEvent handles incoming webhook events
 func ProcessEvent(w http.ResponseWriter, request *http.Request) {
 	log.Print("Received SonarQube event")
@@ -75,7 +72,7 @@ func ProcessEvent(w http.ResponseWriter, request *http.Request) {
 		return
 	}
 
-	conn, err := grpc.Dial(address, grpc.WithInsecure(), grpc.WithBlock())
+	conn, err := grpc.Dial(config.Configuration.RodeAPI.Address, grpc.WithInsecure(), grpc.WithBlock())
 	if err != nil {
 		log.Fatalf("did not connect: %v", err)
 	}
@@ -96,8 +93,8 @@ func ProcessEvent(w http.ResponseWriter, request *http.Request) {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
-	response, err := c.BatchCreateOccurrences(ctx, &grafeas_go_proto.BatchCreateOccurrencesRequest{
-		Occurrences: occurrences,
+	response, err := c.BatchCreateOccurrences(ctx, &pb.BatchCreateOccurrencesRequest{
+		Occurrences: &occurrences,
 	})
 	if err != nil {
 		log.Fatalf("could not create occurrence: %v", err)
