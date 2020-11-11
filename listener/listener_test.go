@@ -31,7 +31,7 @@ var _ = Describe("Listener", func() {
 			},
 		}
 	})
-	Describe("Deteriming Resource URI", func() {
+	Describe("Determining Resource URI", func() {
 		Context("When Using Sonarqube Community Edition", func() {
 			It("should be based on a passed in resource uri prefix", func() {
 				Expect(getRepoFromSonar(generalEvent)).To(Equal("https://github.com/liatrio/springtrader-marketsummary-java:e4834abbbd161241694224b3b91950b3d504a3a3"))
@@ -39,6 +39,7 @@ var _ = Describe("Listener", func() {
 		})
 
 	})
+
 	Describe("Process incoming event", func() {
 		Context("With new valid event", func() {
 			It("Should not error out", func() {
