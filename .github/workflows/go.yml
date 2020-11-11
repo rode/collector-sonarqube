@@ -28,5 +28,5 @@ jobs:
 
       - name: Test
         run: |
-          ginkgo -r -cover -coverprofile=coverage.txt -covermode=atomic -- --rode-api-host="localhost:50051"
+          ginkgo -r -cover -coverprofile=coverage.txt -covermode=atomic
           bash <(curl -s https://codecov.io/bash)
