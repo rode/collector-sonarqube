@@ -7,6 +7,7 @@ require (
 	github.com/grpc-ecosystem/grpc-gateway v1.16.0 // indirect
 	github.com/kr/pretty v0.1.0 // indirect
 	github.com/liatrio/rode-api v0.0.0-20201111165410-30d476656f6f
+	github.com/nxadm/tail v1.4.5 // indirect
 	github.com/onsi/ginkgo v1.14.2
 	github.com/onsi/gomega v1.10.3
 	golang.org/x/net v0.0.0-20201110031124-69a78807bb2b // indirect

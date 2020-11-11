@@ -45,7 +45,6 @@ func NewConfig(configPath string) (*Config, error) {
 
 func init() {
 	flag.StringVar(&RodeAPIHost, "rode-api-host", "localhost:50051", "the grpc host to use to connect to the rode api")
-	flag.Parse()
 
 	var err error
 	Configuration, err = NewConfig("./config.yaml")

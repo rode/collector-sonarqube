@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flag"
 	"log"
 	"net/http"
 
@@ -8,6 +9,7 @@ import (
 )
 
 func main() {
+	flag.Parse()
 	http.HandleFunc("/webhook/event", listener.ProcessEvent)
 
 	log.Println("Listening for SonarQube events")
