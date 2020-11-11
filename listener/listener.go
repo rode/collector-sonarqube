@@ -8,11 +8,11 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/grafeas/grafeas/proto/v1beta1/common_go_proto"
-	"github.com/grafeas/grafeas/proto/v1beta1/grafeas_go_proto"
-	"github.com/grafeas/grafeas/proto/v1beta1/package_go_proto"
-	"github.com/grafeas/grafeas/proto/v1beta1/vulnerability_go_proto"
 	pb "github.com/liatrio/rode-api/proto/v1alpha1"
+	"github.com/liatrio/rode-api/protodeps/grafeas/proto/v1beta1/common_go_proto"
+	"github.com/liatrio/rode-api/protodeps/grafeas/proto/v1beta1/grafeas_go_proto"
+	"github.com/liatrio/rode-api/protodeps/grafeas/proto/v1beta1/package_go_proto"
+	"github.com/liatrio/rode-api/protodeps/grafeas/proto/v1beta1/vulnerability_go_proto"
 	"google.golang.org/grpc"
 	"google.golang.org/protobuf/types/known/timestamppb"
 	"liatr.io/rode-collector-sonarqube/config"
@@ -73,6 +73,7 @@ func ProcessEvent(w http.ResponseWriter, request *http.Request) {
 	}
 
 	conn, err := grpc.Dial(config.Configuration.RodeAPI.Address, grpc.WithInsecure(), grpc.WithBlock())
+
 	if err != nil {
 		log.Fatalf("did not connect: %v", err)
 	}
@@ -94,7 +95,7 @@ func ProcessEvent(w http.ResponseWriter, request *http.Request) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
 	response, err := c.BatchCreateOccurrences(ctx, &pb.BatchCreateOccurrencesRequest{
-		Occurrences: &occurrences,
+		Occurrences: occurrences,
 	})
 	if err != nil {
 		log.Fatalf("could not create occurrence: %v", err)
