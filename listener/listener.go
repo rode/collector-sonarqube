@@ -72,7 +72,7 @@ func ProcessEvent(w http.ResponseWriter, request *http.Request) {
 		return
 	}
 
-	conn, err := grpc.Dial(config.Configuration.RodeAPI.Address, grpc.WithInsecure(), grpc.WithBlock())
+	conn, err := grpc.Dial(config.RodeAPIHost, grpc.WithInsecure(), grpc.WithBlock())
 
 	if err != nil {
 		log.Fatalf("did not connect: %v", err)

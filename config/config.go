@@ -1,6 +1,7 @@
 package config
 
 import (
+	"flag"
 	"log"
 	"os"
 
@@ -8,7 +9,10 @@ import (
 )
 
 // Configuration creates a Global Conifguration to be passed throughout packages
-var Configuration *Config
+var (
+	Configuration *Config
+	RodeAPIHost   string
+)
 
 // Config struct for collector config
 type Config struct {
@@ -40,9 +44,13 @@ func NewConfig(configPath string) (*Config, error) {
 }
 
 func init() {
+	flag.StringVar(&RodeAPIHost, "rode-api-host", "localhost:50051", "the grpc host to use to connect to the rode api")
+	flag.Parse()
+
 	var err error
 	Configuration, err = NewConfig("./config.yaml")
 	if err != nil {
-		log.Fatal(err)
+		log.Println("Failed to find a config file")
+		log.Println(err)
 	}
 }
