@@ -4,10 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/liatrio/rode-collector-sonarqube/sonar"
-	"go.uber.org/zap"
 	"net/http"
 	"time"
+
+	"github.com/liatrio/rode-collector-sonarqube/sonar"
+	"go.uber.org/zap"
 
 	pb "github.com/liatrio/rode-api/proto/v1alpha1"
 	"github.com/liatrio/rode-api/protodeps/grafeas/proto/v1beta1/common_go_proto"
@@ -40,6 +41,7 @@ func (l *listener) ProcessEvent(w http.ResponseWriter, request *http.Request) {
 	event := &sonar.Event{}
 	if err := json.NewDecoder(request.Body).Decode(event); err != nil {
 		w.WriteHeader(500)
+		fmt.Fprintf(w, "error reading webhook event")
 		log.Error("error reading webhook event", zap.NamedError("error", err))
 		return
 	}
