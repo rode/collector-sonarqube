@@ -6,14 +6,13 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
-	"strings"
 
 	"github.com/liatrio/rode-collector-sonarqube/sonar"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
 
-var _ = Describe("Listener", func() {
+var _ = Describe("listener", func() {
 
 	var (
 		listener     Listener
@@ -59,7 +58,8 @@ var _ = Describe("Listener", func() {
 		listener = NewListener(logger, rodeClient)
 		rodeClient.expectedError = nil
 	})
-	Context("Determining Resource URI", func() {
+
+	Context("determining Resource URI", func() {
 		When("using Sonarqube Community Edition", func() {
 			It("should be based on a passed in resource uri prefix", func() {
 				Expect(getRepoFromSonar(generalEvent)).To(Equal("https://github.com/liatrio/springtrader-marketsummary-java:e4834abbbd161241694224b3b91950b3d504a3a3"))
@@ -67,41 +67,47 @@ var _ = Describe("Listener", func() {
 		})
 
 	})
-	Context("Processing incoming event", func() {
-		When("using a valid event", func() {
-			It("should not error out", func() {
-				body, _ := json.Marshal(generalEvent)
-				req, _ := http.NewRequest("POST", "/webhook/event", bytes.NewBuffer(body))
-				rr := httptest.NewRecorder()
-				handler := http.HandlerFunc(listener.ProcessEvent)
+	Context("processing incoming event", func() {
+		var (
+			body []byte
+			rr   *httptest.ResponseRecorder
+		)
 
-				handler.ServeHTTP(rr, req)
+		JustBeforeEach(func() {
+			req, _ := http.NewRequest("POST", "/webhook/event", bytes.NewBuffer(body))
+			rr = httptest.NewRecorder()
+			handler := http.HandlerFunc(listener.ProcessEvent)
+			handler.ServeHTTP(rr, req)
+		})
+
+		When("using a valid event", func() {
+			BeforeEach(func() {
+				body, _ = json.Marshal(generalEvent)
+			})
+
+			It("should not error out", func() {
 				Expect(rr.Result().StatusCode).To(Equal(200))
 			})
 		})
 
 		When("using an invalid event", func() {
-			It("Should return a bad response", func() {
-				req, _ := http.NewRequest("POST", "/webhook/event", strings.NewReader("Bad object"))
-				rr := httptest.NewRecorder()
-				handler := http.HandlerFunc(listener.ProcessEvent)
+			BeforeEach(func() {
+				body = []byte("Bad object")
+			})
 
-				handler.ServeHTTP(rr, req)
+			It("should return a bad response", func() {
 				Expect(rr.Code).To(Equal(500))
 				Expect(rr.Body.String()).To(ContainSubstring("error reading webhook event"))
 			})
 		})
 
 		When("failing to create occurrences", func() {
-			It("Should return a bad response", func() {
-				rodeClient.expectedError = (errors.New("FAILED"))
+			BeforeEach(func() {
+				rodeClient.expectedError = errors.New("FAILED")
+				body, _ = json.Marshal(generalEvent)
+			})
 
-				body, _ := json.Marshal(generalEvent)
-				req, _ := http.NewRequest("POST", "/webhook/event", bytes.NewBuffer(body))
-				rr := httptest.NewRecorder()
-				handler := http.HandlerFunc(listener.ProcessEvent)
-
-				handler.ServeHTTP(rr, req)
+			It("should return a bad response", func() {
 				Expect(rr.Code).To(Equal(500))
 			})
 		})
