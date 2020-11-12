@@ -13,26 +13,32 @@ import (
 
 var _ = Describe("Listener", func() {
 
-	var generalEvent *Event
+	var (
+		listener Listener
+	)
+
+	//var generalEvent *Event
 
 	BeforeEach(func() {
-		generalEvent = &Event{
-			TaskID:     "AXW39ga8rPJdWZ8bmqZS",
-			Status:     "SUCCESS",
-			AnalyzedAt: "2020-11-11T15:39:05+0000",
-			GitCommit:  "e4834abbbd161241694224b3b91950b3d504a3a3",
-			Project: &Project{
-				Key:  "org.springframework.nanotrader:springtrader-marketSummary",
-				Name: "springtrader-marketSummary",
-				URL:  "http://localhost:9000/dashboard?id=org.springframework.nanotrader%3Aspringtrader-marketSummary",
-			},
-			Properties: map[string]string{
-				"sonar.analysis.resourceUriPrefix": "https://github.com/liatrio/springtrader-marketsummary-java",
-			},
-		}
+		//generalEvent = &Event{
+		//	TaskID:     "AXW39ga8rPJdWZ8bmqZS",
+		//	Status:     "SUCCESS",
+		//	AnalyzedAt: "2020-11-11T15:39:05+0000",
+		//	GitCommit:  "e4834abbbd161241694224b3b91950b3d504a3a3",
+		//	Project: &Project{
+		//		Key:  "org.springframework.nanotrader:springtrader-marketSummary",
+		//		Name: "springtrader-marketSummary",
+		//		URL:  "http://localhost:9000/dashboard?id=org.springframework.nanotrader%3Aspringtrader-marketSummary",
+		//	},
+		//	Properties: map[string]string{
+		//		"sonar.analysis.resourceUriPrefix": "https://github.com/liatrio/springtrader-marketsummary-java",
+		//	},
+		//}
+
+		listener = NewListener(logger)
 	})
-	Describe("Determining Resource URI", func() {
-		Context("When Using Sonarqube Community Edition", func() {
+	Context("Determining Resource URI", func() {
+		When("using Sonarqube Community Edition", func() {
 			It("should be based on a passed in resource uri prefix", func() {
 				Expect(getRepoFromSonar(generalEvent)).To(Equal("https://github.com/liatrio/springtrader-marketsummary-java:e4834abbbd161241694224b3b91950b3d504a3a3"))
 			})

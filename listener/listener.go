@@ -4,7 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
+	"github.com/liatrio/rode-collector-sonarqube/sonar"
+	"go.uber.org/zap"
 	"net/http"
 	"time"
 
@@ -13,98 +14,61 @@ import (
 	"github.com/liatrio/rode-api/protodeps/grafeas/proto/v1beta1/grafeas_go_proto"
 	"github.com/liatrio/rode-api/protodeps/grafeas/proto/v1beta1/package_go_proto"
 	"github.com/liatrio/rode-api/protodeps/grafeas/proto/v1beta1/vulnerability_go_proto"
-	"google.golang.org/grpc"
 	"google.golang.org/protobuf/types/known/timestamppb"
-	"liatr.io/rode-collector-sonarqube/config"
 )
 
-// Event is...
-type Event struct {
-	TaskID      string            `json:"taskid"`
-	Status      string            `json:"status"`
-	AnalyzedAt  string            `json:"analyzedat"`
-	GitCommit   string            `json:"revision"`
-	Project     *Project          `json:"project"`
-	QualityGate *QualityGate      `json:"qualityGate"`
-	Branch      *Branch           `json:"branch"`
-	Properties  map[string]string `json:"properties"`
+type listener struct {
+	rodeClient pb.RodeClient
+	logger     *zap.Logger
 }
 
-// Branch is...
-type Branch struct {
-	Name   string `json:"name"`
-	Type   string `json:"type"`
-	IsMain bool   `json:"isMain"`
-	URL    string `json:"url"`
+type Listener interface {
+	ProcessEvent(http.ResponseWriter, *http.Request)
 }
 
-// Project is
-type Project struct {
-	Key  string `json:"key"`
-	Name string `json:"name"`
-	URL  string `json:"url"`
-}
-
-// QualityGate is...
-type QualityGate struct {
-	Conditions []*Condition `json:"conditions"`
-	Name       string       `json:"name"`
-	Status     string       `json:"status"`
-}
-
-// Condition is...
-type Condition struct {
-	ErrorThreshold string `json:"errorThreshold"`
-	Metric         string `json:"metric"`
-	OnLeakPeriod   bool   `json:"onLeakPeriod"`
-	Operator       string `json:"operator"`
-	Status         string `json:"status"`
+func NewListener(logger *zap.Logger, client pb.RodeClient) Listener {
+	return &listener{
+		rodeClient: client,
+		logger:     logger,
+	}
 }
 
 // ProcessEvent handles incoming webhook events
-func ProcessEvent(w http.ResponseWriter, request *http.Request) {
-	log.Print("Received SonarQube event")
+func (l *listener) ProcessEvent(w http.ResponseWriter, request *http.Request) {
+	log := l.logger.Named("ProcessEvent")
 
-	event := &Event{}
+	event := &sonar.Event{}
 	if err := json.NewDecoder(request.Body).Decode(event); err != nil {
 		w.WriteHeader(500)
-		fmt.Fprintf(w, "Error reading webhook event: %s", err)
+		log.Error("error reading webhook event", zap.NamedError("error", err))
 		return
 	}
 
-	conn, err := grpc.Dial(config.RodeAPIHost, grpc.WithInsecure(), grpc.WithBlock())
-
-	if err != nil {
-		log.Fatalf("did not connect: %v", err)
-	}
-	defer conn.Close()
-	c := pb.NewRodeClient(conn)
-	occurrences := []*grafeas_go_proto.Occurrence{}
-
-	log.Printf("SonarQube Event Payload: [%+v]", event)
-	log.Printf("SonarQube Event Project: [%+v]", event.Project)
-	log.Printf("SonarQube Event Quality Gate: [%+v]", event.QualityGate)
+	log.Debug("received sonarqube event", zap.Any("event", event), zap.Any("project", event.Project), zap.Any("qualityGate", event.QualityGate))
 
 	repo := getRepoFromSonar(event)
 
+	var occurrences []*grafeas_go_proto.Occurrence
 	for _, condition := range event.QualityGate.Conditions {
-		log.Printf("SonarQube Event Quality Gate Condition: [%+v]", condition)
+		log.Debug("sonarqube event quality gate condition", zap.Any("condition", condition))
 		occurrence := createQualityGateOccurrence(condition, repo)
 		occurrences = append(occurrences, occurrence)
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
-	response, err := c.BatchCreateOccurrences(ctx, &pb.BatchCreateOccurrencesRequest{
+	response, err := l.rodeClient.BatchCreateOccurrences(ctx, &pb.BatchCreateOccurrencesRequest{
 		Occurrences: occurrences,
 	})
 	if err != nil {
-		log.Fatalf("could not create occurrence: %v", err)
+		log.Error("error sending occurrences to rode", zap.NamedError("error", err))
 	}
-	fmt.Printf("%#v\n", response)
+
+	log.Debug("response payload", zap.Any("response", response.GetOccurrences()))
 	w.WriteHeader(200)
 }
 
-func getRepoFromSonar(event *Event) string {
+func getRepoFromSonar(event *sonar.Event) string {
 	/*
 		// Need to add logic to check if they are using developer or enterprise edition, but current API
 		// only exposes this to admin users. Getting the resource URI is easier in the developer edition and is
@@ -119,7 +83,7 @@ func getRepoFromSonar(event *Event) string {
 	return repoString
 }
 
-func createQualityGateOccurrence(condition *Condition, repo string) *grafeas_go_proto.Occurrence {
+func createQualityGateOccurrence(condition *sonar.Condition, repo string) *grafeas_go_proto.Occurrence {
 	occurrence := &grafeas_go_proto.Occurrence{
 		Name: condition.Metric,
 		Resource: &grafeas_go_proto.Resource{

@@ -1,9 +1,9 @@
-module liatr.io/rode-collector-sonarqube
+module github.com/liatrio/rode-collector-sonarqube
 
 go 1.15
 
 require (
-	github.com/grafeas/grafeas v0.1.7-0.20201110183905-095ca16c51db
+	github.com/grafeas/grafeas v0.1.7-0.20201110183905-095ca16c51db // indirect
 	github.com/grpc-ecosystem/grpc-gateway v1.16.0 // indirect
 	github.com/kr/pretty v0.1.0 // indirect
 	github.com/liatrio/rode-api v0.0.0-20201111165410-30d476656f6f
@@ -18,5 +18,5 @@ require (
 	google.golang.org/grpc/cmd/protoc-gen-go-grpc v1.0.1 // indirect
 	google.golang.org/protobuf v1.25.0
 	gopkg.in/check.v1 v1.0.0-20180628173108-788fd7840127 // indirect
-	gopkg.in/yaml.v2 v2.3.0
+	gopkg.in/yaml.v2 v2.3.0 // indirect
 )
