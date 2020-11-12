@@ -64,6 +64,8 @@ func (l *listener) ProcessEvent(w http.ResponseWriter, request *http.Request) {
 	})
 	if err != nil {
 		log.Error("error sending occurrences to rode", zap.NamedError("error", err))
+		w.WriteHeader(500)
+		return
 	}
 
 	log.Debug("response payload", zap.Any("response", response.GetOccurrences()))

@@ -3,6 +3,7 @@ package listener
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -21,6 +22,20 @@ var _ = Describe("Listener", func() {
 	)
 
 	BeforeEach(func() {
+		var (
+			coverageCondition     *sonar.Condition
+			qualityGateConditions []*sonar.Condition
+		)
+
+		coverageCondition = &sonar.Condition{
+			ErrorThreshold: "80",
+			Metric:         "new_coverage",
+			OnLeakPeriod:   true,
+			Operator:       "LESS_THAN",
+			Status:         "OK",
+		}
+		qualityGateConditions = append(qualityGateConditions, coverageCondition)
+
 		generalEvent = &sonar.Event{
 			TaskID:     "AXW39ga8rPJdWZ8bmqZS",
 			Status:     "SUCCESS",
@@ -34,10 +49,15 @@ var _ = Describe("Listener", func() {
 			Properties: map[string]string{
 				"sonar.analysis.resourceUriPrefix": "https://github.com/liatrio/springtrader-marketsummary-java",
 			},
-		}
+			QualityGate: &sonar.QualityGate{
+				Conditions: qualityGateConditions,
+				Name:       "SonarQube way",
+				Status:     "OK",
+			}}
 
 		rodeClient = &mockRodeClient{}
 		listener = NewListener(logger, rodeClient)
+		rodeClient.expectedError = nil
 	})
 	Context("Determining Resource URI", func() {
 		When("using Sonarqube Community Edition", func() {
@@ -50,36 +70,7 @@ var _ = Describe("Listener", func() {
 	Context("Processing incoming event", func() {
 		When("using a valid event", func() {
 			It("should not error out", func() {
-				var (
-					coverageCondition     *sonar.Condition
-					qualityGateConditions []*sonar.Condition
-				)
-
-				coverageCondition = &sonar.Condition{
-					ErrorThreshold: "80",
-					Metric:         "new_coverage",
-					OnLeakPeriod:   true,
-					Operator:       "LESS_THAN",
-					Status:         "OK",
-				}
-				qualityGateConditions = append(qualityGateConditions, coverageCondition)
-				event := &sonar.Event{
-					TaskID:     "xxx",
-					Status:     "OK",
-					AnalyzedAt: "2016-11-18T10:46:28+0100",
-					GitCommit:  "c739069ec7105e01303e8b3065a81141aad9f129",
-					Project: &sonar.Project{
-						Key:  "testproject",
-						Name: "Test Project",
-						URL:  "https://mycompany.com/sonarqube/dashboard?id=myproject",
-					},
-					QualityGate: &sonar.QualityGate{
-						Conditions: qualityGateConditions,
-						Name:       "SonarQube way",
-						Status:     "OK",
-					},
-				}
-				body, _ := json.Marshal(event)
+				body, _ := json.Marshal(generalEvent)
 				req, _ := http.NewRequest("POST", "/webhook/event", bytes.NewBuffer(body))
 				rr := httptest.NewRecorder()
 				handler := http.HandlerFunc(listener.ProcessEvent)
@@ -98,6 +89,20 @@ var _ = Describe("Listener", func() {
 				handler.ServeHTTP(rr, req)
 				Expect(rr.Code).To(Equal(500))
 				Expect(rr.Body.String()).To(ContainSubstring("error reading webhook event"))
+			})
+		})
+
+		When("failing to create occurrences", func() {
+			It("Should return a bad response", func() {
+				rodeClient.expectedError = (errors.New("FAILED"))
+
+				body, _ := json.Marshal(generalEvent)
+				req, _ := http.NewRequest("POST", "/webhook/event", bytes.NewBuffer(body))
+				rr := httptest.NewRecorder()
+				handler := http.HandlerFunc(listener.ProcessEvent)
+
+				handler.ServeHTTP(rr, req)
+				Expect(rr.Code).To(Equal(500))
 			})
 		})
 	})
