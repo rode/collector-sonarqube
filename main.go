@@ -3,13 +3,14 @@ package main
 import (
 	"flag"
 	"fmt"
-	pb "github.com/liatrio/rode-api/proto/v1alpha1"
-	"go.uber.org/zap"
-	"google.golang.org/grpc"
 	"log"
 	"net/http"
 
-	"liatr.io/rode-collector-sonarqube/listener"
+	pb "github.com/liatrio/rode-api/proto/v1alpha1"
+	"go.uber.org/zap"
+	"google.golang.org/grpc"
+
+	"github.com/liatrio/rode-collector-sonarqube/listener"
 )
 
 var (
@@ -54,4 +55,3 @@ func createLogger(debug bool) (*zap.Logger, error) {
 
 	return zap.NewProduction()
 }
-
