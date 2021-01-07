@@ -28,7 +28,7 @@ helm install sonarqube oteemocharts/sonarqube
 export POD_NAME=$(kubectl get pods --namespace default -l "app=sonarqube,release=sonarqube" -o jsonpath="{.items[0].metadata.name}")\n  echo "Visit http://127.0.0.1:9000 to use your application"\n  kubectl port-forward $POD_NAME 9000:9000 -n default
 ngrok http 8080     #needed to setup endpoint for sonarqube
 
-# Scan a project
+# Create a project
 git clone https://github.com/liatrio/springtrader-marketsummary-java
 # Run gradlew with the given command in sonarqube plus the flag mentioned above, ie
 ./gradlew sonarqube \
