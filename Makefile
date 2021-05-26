@@ -3,13 +3,6 @@ GOFMT_FILES?=$$(find . -name '*.go' | grep -v proto)
 
 GO111MODULE=on
 
-tools:
-	go generate ./tools
-
-generate:
-	docker build . -t ghcr.io/liatrio/rode-collector-sonarqube:latest
-	docker run -it --rm -v $$(pwd):/workspace ghcr.io/liatrio/rode-collector-sonarqube:latest
-
 fmtcheck:
 	lineCount=$(shell gofmt -l -s $(GOFMT_FILES) | wc -l | tr -d ' ') && exit $$lineCount
 

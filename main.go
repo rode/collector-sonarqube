@@ -16,44 +16,51 @@ package main
 
 import (
 	"context"
-	"flag"
+	"crypto/tls"
 	"fmt"
+	"github.com/rode/collector-sonarqube/config"
+	"google.golang.org/grpc/credentials"
 	"log"
 	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
-	pb "github.com/liatrio/rode-api/proto/v1alpha1"
+	pb "github.com/rode/rode/proto/v1alpha1"
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
 
-	"github.com/liatrio/rode-collector-sonarqube/listener"
-)
-
-var (
-	debug    bool
-	port     int
-	rodeHost string
+	"github.com/rode/collector-sonarqube/listener"
 )
 
 func main() {
-	flag.IntVar(&port, "port", 8080, "the port that the sonarqube collector should listen on")
-	flag.BoolVar(&debug, "debug", false, "when set, debug mode will be enabled")
-	flag.StringVar(&rodeHost, "rode-host", "localhost:50051", "the host to use to connect to rode")
+	conf, err := config.Build(os.Args[0], os.Args[1:])
+	if err != nil {
+		log.Fatalf("error parsing flags: %v", err)
+	}
 
-	flag.Parse()
-
-	logger, err := createLogger(debug)
+	logger, err := createLogger(conf.Debug)
 	if err != nil {
 		log.Fatalf("failed to create logger: %v", err)
 	}
 
-	conn, err := grpc.Dial(rodeHost, grpc.WithInsecure(), grpc.WithBlock())
-	defer conn.Close()
-	if err != nil {
-		logger.Fatal("failed to establish grpc connection to Rode API", zap.NamedError("error", err))
+	dialOptions := []grpc.DialOption{
+		grpc.WithBlock(),
 	}
+	if conf.RodeConfig.Insecure {
+		dialOptions = append(dialOptions, grpc.WithInsecure())
+	} else {
+		dialOptions = append(dialOptions, grpc.WithTransportCredentials(credentials.NewTLS(&tls.Config{})))
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
+	defer cancel()
+	conn, err := grpc.DialContext(ctx, conf.RodeConfig.Host, dialOptions...)
+	if err != nil {
+		logger.Fatal("failed to establish grpc connection to Rode", zap.Error(err))
+	}
+	defer conn.Close()
 
 	rodeClient := pb.NewRodeClient(conn)
 
@@ -63,7 +70,7 @@ func main() {
 	mux.HandleFunc("/webhook/event", l.ProcessEvent)
 	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) { fmt.Fprintf(w, "I'm healthy") })
 	server := &http.Server{
-		Addr:    fmt.Sprintf(":%d", port),
+		Addr:    fmt.Sprintf(":%d", conf.Port),
 		Handler: mux,
 	}
 
