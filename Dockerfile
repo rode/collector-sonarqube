@@ -1,10 +1,7 @@
 # syntax = docker/dockerfile:experimental
-# Build the manager binary
-FROM golang:1.15-alpine as builder
+FROM golang:1.16 as builder
 
 WORKDIR /workspace
-
-RUN apk add --no-cache gcc libc-dev
 
 # Copy the Go Modules manifests
 COPY go.mod go.sum /workspace/
@@ -15,6 +12,7 @@ RUN go mod download
 
 # Copy the go source
 COPY main.go main.go
+COPY sonar sonar
 COPY listener listener
 
 # Build
@@ -30,12 +28,3 @@ COPY --from=builder /workspace/rode-collector-sonarqube .
 USER nonroot:nonroot
 
 ENTRYPOINT ["./rode-collector-sonarqube"]
-EXPOSE 8080
-
-
-# - docker build -t rode-collector-sonarqube:buildID --target=builder
-# - copy coverage out
-#   - docker run rode-collector-sonarqube:buildID
-#   - docker cp rode-collector-sonarqube:buildID coverage.txt .
-#   - docker rm rode-collector-sonaqube
-# - docker build -t rode-collector-sonarqube --target=artifact
