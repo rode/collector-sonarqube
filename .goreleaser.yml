@@ -13,12 +13,14 @@ dockers:
       - "ghcr.io/rode/collector-sonarqube:latest"
       - "ghcr.io/rode/collector-sonarqube:{{ .Tag }}"
       - "ghcr.io/rode/collector-sonarqube:v{{ .Major }}"
+      - "ghcr.io/rode/collector-sonarqube:v{{ .Major }}.{{ .Minor }}"
     extra_files:
       - "go.mod"
       - "go.sum"
       - "main.go"
       - "config"
       - "listener"
+      - "sonar"
 checksum:
   name_template: 'checksums.txt'
 snapshot:
