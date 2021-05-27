@@ -16,10 +16,10 @@ package sonar
 
 // Event is...
 type Event struct {
-	TaskID      string            `json:"taskid"`
+	TaskId      string            `json:"taskId"`
 	Status      string            `json:"status"`
-	AnalyzedAt  string            `json:"analyzedat"`
-	GitCommit   string            `json:"revision"`
+	AnalysedAt  string            `json:"analysedAt"`
+	Revision    string            `json:"revision"`
 	Project     *Project          `json:"project"`
 	QualityGate *QualityGate      `json:"qualityGate"`
 	Branch      *Branch           `json:"branch"`
@@ -43,10 +43,17 @@ type Project struct {
 
 // QualityGate is...
 type QualityGate struct {
-	Conditions []*Condition `json:"conditions"`
-	Name       string       `json:"name"`
-	Status     string       `json:"status"`
+	Conditions []*Condition      `json:"conditions"`
+	Name       string            `json:"name"`
+	Status     QualityGateStatus `json:"status"`
 }
+
+type QualityGateStatus string
+
+const (
+	STATUS_OK    QualityGateStatus = "OK"
+	STATUS_ERROR QualityGateStatus = "ERROR"
+)
 
 // Condition is...
 type Condition struct {
