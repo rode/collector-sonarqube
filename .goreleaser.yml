@@ -1,4 +1,5 @@
 project_name: rode-collector-sonarqube
+before:
   hooks:
     - go mod download
 builds:
