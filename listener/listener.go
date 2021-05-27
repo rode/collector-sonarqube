@@ -18,7 +18,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/rode/rode/protodeps/grafeas/proto/v1beta1/discovery_go_proto"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/rode/collector-sonarqube/sonar"
@@ -27,9 +29,11 @@ import (
 	pb "github.com/rode/rode/proto/v1alpha1"
 	"github.com/rode/rode/protodeps/grafeas/proto/v1beta1/common_go_proto"
 	"github.com/rode/rode/protodeps/grafeas/proto/v1beta1/grafeas_go_proto"
-	"github.com/rode/rode/protodeps/grafeas/proto/v1beta1/package_go_proto"
-	"github.com/rode/rode/protodeps/grafeas/proto/v1beta1/vulnerability_go_proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
+)
+
+const (
+	resourceUriPrefixPropertyName = "sonar.analysis.resourceUriPrefix"
 )
 
 type listener struct {
@@ -54,30 +58,38 @@ func (l *listener) ProcessEvent(w http.ResponseWriter, request *http.Request) {
 
 	event := &sonar.Event{}
 	if err := json.NewDecoder(request.Body).Decode(event); err != nil {
-		w.WriteHeader(500)
-		fmt.Fprintf(w, "error reading webhook event")
-		log.Error("error reading webhook event", zap.NamedError("error", err))
+		log.Error("error reading webhook event", zap.Error(err))
+		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 
-	log.Debug("received sonarqube event", zap.Any("event", event), zap.Any("project", event.Project), zap.Any("qualityGate", event.QualityGate))
+	log = log.With(zap.Any("event", event))
+	log.Debug("received sonarqube event")
 
-	repo := getRepoFromSonar(event)
-
-	var occurrences []*grafeas_go_proto.Occurrence
-	for _, condition := range event.QualityGate.Conditions {
-		log.Debug("sonarqube event quality gate condition", zap.Any("condition", condition))
-		occurrence := createQualityGateOccurrence(condition, repo)
-		occurrences = append(occurrences, occurrence)
+	resourceUri, err := getResourceUriFromEvent(event)
+	if err != nil {
+		log.Error("error getting resource uri from event", zap.Error(err))
+		// there's no point in responding with an error to sonar, as this is a user error
+		w.WriteHeader(http.StatusOK)
+		return
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	// allow for one minute to process this event
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
-	response, err := l.rodeClient.BatchCreateOccurrences(ctx, &pb.BatchCreateOccurrencesRequest{
-		Occurrences: occurrences,
-	})
+
+	// create a note to represent the sonar analysis
+	noteName, err := l.createNoteForEvent(ctx, event)
 	if err != nil {
-		log.Error("error sending occurrences to rode", zap.NamedError("error", err))
+		log.Error("error creating note for analysis", zap.Error(err))
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	// create occurrences for sonar analysis
+	response, err := l.createOccurrencesForEvent(ctx, event, resourceUri, noteName)
+	if err != nil {
+		log.Error("error creating occurrences for event", zap.Error(err))
 		w.WriteHeader(500)
 		return
 	}
@@ -86,67 +98,112 @@ func (l *listener) ProcessEvent(w http.ResponseWriter, request *http.Request) {
 	w.WriteHeader(200)
 }
 
-func getRepoFromSonar(event *sonar.Event) string {
-	/*
-		// Need to add logic to check if they are using developer or enterprise edition, but current API
-		// only exposes this to admin users. Getting the resource URI is easier in the developer edition and is
-		// not dependent on a value passed in from the project. It can be done like this:
-		if isNotCommunityEdition(){
-			repoString := fmt.Sprintf("%s:%s",event.Branch.URL,event.GitCommit)
-			return repoString
-		}
-	*/
+// getResourceUriFromEvent parses the received event and returns a resource URI that can be referenced in occurrences.
+// Eventually, this needs to check if the community edition or the developer edition of sonar is being used. The events
+// sent from the developer edition should contain information about the repository URL that can be used to construct the
+// resource URI. Unfortunately, the community edition requires that an extra property "resourceUriPrefix" is sent with the
+// scan. We'll throw an error here if this property isn't present.
+func getResourceUriFromEvent(event *sonar.Event) (string, error) {
+	prefix, ok := event.Properties[resourceUriPrefixPropertyName]
+	if !ok {
+		return "", fmt.Errorf("expected event to contain the resource uri prefix. please run the scanner with the \"-D%s\" option", resourceUriPrefixPropertyName)
+	}
 
-	repoString := fmt.Sprintf("%s:%s", event.Properties["sonar.analysis.resourceUriPrefix"], event.GitCommit)
-	return repoString
+	// add the expected "git://" prefix if it isn't provided
+	if !strings.HasPrefix(prefix, "git://") {
+		prefix = fmt.Sprintf("git://%s", prefix)
+	}
+
+	return fmt.Sprintf("%s@%s", prefix, event.Revision), nil
 }
 
-func createQualityGateOccurrence(condition *sonar.Condition, repo string) *grafeas_go_proto.Occurrence {
-	occurrence := &grafeas_go_proto.Occurrence{
-		Name: condition.Metric,
-		Resource: &grafeas_go_proto.Resource{
-			Name: repo,
-			Uri:  repo,
+// createNoteForEvent creates a note that represents the sonar analysis.
+func (l *listener) createNoteForEvent(ctx context.Context, event *sonar.Event) (string, error) {
+	note, err := l.rodeClient.CreateNote(ctx, &pb.CreateNoteRequest{
+		Note: &grafeas_go_proto.Note{
+			ShortDescription: "SonarQube Analysis",
+			LongDescription:  fmt.Sprintf("SonarQube Analysis using %s Quality Gate", event.QualityGate.Name),
+			Kind:             common_go_proto.NoteKind_DISCOVERY,
+			RelatedUrl: []*common_go_proto.RelatedUrl{
+				{
+					Label: "Project URL",
+					Url:   event.Project.URL,
+				},
+			},
+			Type: &grafeas_go_proto.Note_Discovery{
+				Discovery: &discovery_go_proto.Discovery{
+					// in the future, this should reference the new static analysis note kind
+					AnalysisKind: common_go_proto.NoteKind_VULNERABILITY,
+				},
+			},
 		},
-		NoteName:    "projects/notes_project/notes/sonarqube",
-		Kind:        common_go_proto.NoteKind_NOTE_KIND_UNSPECIFIED,
-		Remediation: "test",
-		CreateTime:  timestamppb.Now(),
-		// To be changed when a proper occurrence type is determined
-		Details: &grafeas_go_proto.Occurrence_Vulnerability{
-			Vulnerability: &vulnerability_go_proto.Details{
-				Type:             "test",
-				Severity:         vulnerability_go_proto.Severity_CRITICAL,
-				ShortDescription: "abc",
-				LongDescription:  "abc123",
-				RelatedUrls: []*common_go_proto.RelatedUrl{
-					{
-						Url:   "test",
-						Label: "test",
-					},
-					{
-						Url:   "test",
-						Label: "test",
+		NoteId: fmt.Sprintf("sonar-scan-%s", event.TaskId),
+	})
+	if err != nil {
+		return "", err
+	}
+
+	return note.Name, nil
+}
+
+// createOccurrencesForEvent creates occurrences based on the received sonar event. We use discovery occurrences here
+// due to the lack of a better occurrence type. We also misuse the discovery analysis status, such that "FAILED" is
+// equivalent to a failing quality gate, rather than the analysis as a whole failing. This will be revisited with the
+// addition of a new static analysis occurrence type.
+func (l *listener) createOccurrencesForEvent(ctx context.Context, event *sonar.Event, resourceUri, noteName string) (*pb.BatchCreateOccurrencesResponse, error) {
+	timestamp, err := eventTimestamp(event)
+	if err != nil {
+		return nil, err
+	}
+
+	status := discovery_go_proto.Discovered_FINISHED_SUCCESS
+	if event.QualityGate.Status != sonar.STATUS_OK {
+		status = discovery_go_proto.Discovered_FINISHED_FAILED
+	}
+
+	return l.rodeClient.BatchCreateOccurrences(ctx, &pb.BatchCreateOccurrencesRequest{
+		Occurrences: []*grafeas_go_proto.Occurrence{
+			{
+				Resource: &grafeas_go_proto.Resource{
+					Uri: resourceUri,
+				},
+				NoteName:   noteName,
+				Kind:       common_go_proto.NoteKind_DISCOVERY,
+				CreateTime: timestamp,
+				Details: &grafeas_go_proto.Occurrence_Discovered{
+					Discovered: &discovery_go_proto.Details{
+						Discovered: &discovery_go_proto.Discovered{
+							ContinuousAnalysis: discovery_go_proto.Discovered_CONTINUOUS_ANALYSIS_UNSPECIFIED,
+							AnalysisStatus:     discovery_go_proto.Discovered_SCANNING,
+						},
 					},
 				},
-				EffectiveSeverity: vulnerability_go_proto.Severity_CRITICAL,
-				PackageIssue: []*vulnerability_go_proto.PackageIssue{
-					{
-						SeverityName: "test",
-						AffectedLocation: &vulnerability_go_proto.VulnerabilityLocation{
-							CpeUri:  "test",
-							Package: "test",
-							Version: &package_go_proto.Version{
-								Name:     "test",
-								Revision: "test",
-								Epoch:    35,
-								Kind:     package_go_proto.Version_MINIMUM,
-							},
+			},
+			{
+				Resource: &grafeas_go_proto.Resource{
+					Uri: resourceUri,
+				},
+				NoteName:   noteName,
+				Kind:       common_go_proto.NoteKind_DISCOVERY,
+				CreateTime: timestamp,
+				Details: &grafeas_go_proto.Occurrence_Discovered{
+					Discovered: &discovery_go_proto.Details{
+						Discovered: &discovery_go_proto.Discovered{
+							ContinuousAnalysis: discovery_go_proto.Discovered_CONTINUOUS_ANALYSIS_UNSPECIFIED,
+							AnalysisStatus:     status,
 						},
 					},
 				},
 			},
 		},
+	})
+}
+
+func eventTimestamp(event *sonar.Event) (*timestamppb.Timestamp, error) {
+	timestamp, err := time.Parse("2006-01-02T15:04:05+0000", event.AnalysedAt)
+	if err != nil {
+		return nil, err
 	}
-	return occurrence
+
+	return timestamppb.New(timestamp), nil
 }

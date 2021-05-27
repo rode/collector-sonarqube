@@ -17,6 +17,7 @@ package main
 import (
 	"context"
 	"crypto/tls"
+	"errors"
 	"fmt"
 	"github.com/rode/collector-sonarqube/config"
 	"google.golang.org/grpc/credentials"
@@ -76,7 +77,7 @@ func main() {
 
 	go func() {
 		err = server.ListenAndServe()
-		if err != nil {
+		if err != nil && !errors.Is(err, http.ErrServerClosed) {
 			logger.Fatal("could not start http server...", zap.NamedError("error", err))
 		}
 	}()
