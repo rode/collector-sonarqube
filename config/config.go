@@ -16,6 +16,7 @@ package config
 
 import (
 	"flag"
+	"github.com/peterbourgon/ff/v3"
 	"github.com/rode/rode/common"
 )
 
@@ -40,7 +41,7 @@ func Build(name string, args []string) (*Config, error) {
 	flags.IntVar(&c.Port, "port", 8080, "the port that the sonarqube collector should listen on")
 	flags.BoolVar(&c.Debug, "debug", false, "when set, debug mode will be enabled")
 
-	err := flags.Parse(args)
+	err := ff.Parse(flags, args, ff.WithEnvVarNoPrefix())
 	if err != nil {
 		return nil, err
 	}
