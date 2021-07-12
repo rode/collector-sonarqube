@@ -14,7 +14,3 @@ vet:
 
 test: fmtcheck vet
 	go test -v ./... -coverprofile=coverage.txt -covermode atomic
-
-mocks:
-	go install github.com/maxbrunsfeld/counterfeiter/v6@v6.4.1
-	COUNTERFEITER_NO_GENERATE_WARNING="true" go generate mocks/generate.go
