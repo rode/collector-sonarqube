@@ -16,23 +16,17 @@ package main
 
 import (
 	"context"
-	"crypto/tls"
 	"errors"
 	"fmt"
 	"github.com/rode/collector-sonarqube/config"
-	"google.golang.org/grpc/credentials"
+	"github.com/rode/collector-sonarqube/listener"
+	"github.com/rode/rode/common"
+	"go.uber.org/zap"
 	"log"
 	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
-	"time"
-
-	pb "github.com/rode/rode/proto/v1alpha1"
-	"go.uber.org/zap"
-	"google.golang.org/grpc"
-
-	"github.com/rode/collector-sonarqube/listener"
 )
 
 func main() {
@@ -46,24 +40,10 @@ func main() {
 		log.Fatalf("failed to create logger: %v", err)
 	}
 
-	dialOptions := []grpc.DialOption{
-		grpc.WithBlock(),
-	}
-	if conf.RodeConfig.Insecure {
-		dialOptions = append(dialOptions, grpc.WithInsecure())
-	} else {
-		dialOptions = append(dialOptions, grpc.WithTransportCredentials(credentials.NewTLS(&tls.Config{})))
-	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
-	defer cancel()
-	conn, err := grpc.DialContext(ctx, conf.RodeConfig.Host, dialOptions...)
+	rodeClient, err := common.NewRodeClient(conf.ClientConfig)
 	if err != nil {
-		logger.Fatal("failed to establish grpc connection to Rode", zap.Error(err))
+		logger.Fatal("could not create rode client", zap.Error(err))
 	}
-	defer conn.Close()
-
-	rodeClient := pb.NewRodeClient(conn)
 
 	l := listener.NewListener(logger.Named("listener"), rodeClient)
 
