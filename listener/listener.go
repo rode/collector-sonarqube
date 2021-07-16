@@ -17,6 +17,7 @@ package listener
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"github.com/rode/rode/protodeps/grafeas/proto/v1beta1/discovery_go_proto"
 	"net/http"
@@ -119,10 +120,19 @@ func getResourceUriFromEvent(event *sonar.Event) (string, error) {
 
 // createNoteForEvent creates a note that represents the sonar analysis.
 func (l *listener) createNoteForEvent(ctx context.Context, event *sonar.Event) (string, error) {
+	var longDescription string
+	if event.Status == sonar.STATUS_FAILED {
+		longDescription = "Failed SonarQube Analysis"
+	} else if event.Status == sonar.STATUS_SUCCESS && event.QualityGate != nil {
+		longDescription = fmt.Sprintf("SonarQube Analysis using %s Quality Gate", event.QualityGate.Name)
+	} else {
+		return "", errors.New("unexpected event payload, unable to compute note for event")
+	}
+
 	note, err := l.rodeClient.CreateNote(ctx, &pb.CreateNoteRequest{
 		Note: &grafeas_go_proto.Note{
 			ShortDescription: "SonarQube Analysis",
-			LongDescription:  fmt.Sprintf("SonarQube Analysis using %s Quality Gate", event.QualityGate.Name),
+			LongDescription:  longDescription,
 			Kind:             common_go_proto.NoteKind_DISCOVERY,
 			RelatedUrl: []*common_go_proto.RelatedUrl{
 				{
@@ -156,9 +166,9 @@ func (l *listener) createOccurrencesForEvent(ctx context.Context, event *sonar.E
 		return nil, err
 	}
 
-	status := discovery_go_proto.Discovered_FINISHED_SUCCESS
-	if event.QualityGate.Status != sonar.STATUS_OK {
-		status = discovery_go_proto.Discovered_FINISHED_FAILED
+	status := discovery_go_proto.Discovered_FINISHED_FAILED
+	if event.Status == sonar.STATUS_SUCCESS && event.QualityGate != nil && event.QualityGate.Status == sonar.STATUS_OK {
+		status = discovery_go_proto.Discovered_FINISHED_SUCCESS
 	}
 
 	return l.rodeClient.BatchCreateOccurrences(ctx, &pb.BatchCreateOccurrencesRequest{
