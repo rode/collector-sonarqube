@@ -120,7 +120,7 @@ var _ = Describe("listener", func() {
 			BeforeEach(func() {
 				expectedSonarEvent = &sonar.Event{
 					TaskId:     expectedTaskId,
-					Status:     "SUCCESS",
+					Status:     sonar.STATUS_SUCCESS,
 					AnalysedAt: "2021-05-27T19:08:23+0000",
 					Revision:   expectedRevision,
 					Project: &sonar.Project{
@@ -181,7 +181,8 @@ var _ = Describe("listener", func() {
 
 			When("the analysis fails", func() {
 				BeforeEach(func() {
-					expectedSonarEvent.QualityGate.Status = sonar.STATUS_ERROR
+					expectedSonarEvent.Status = sonar.STATUS_FAILED
+					expectedSonarEvent.QualityGate = nil
 				})
 
 				It("should indicate the failure in the discovery occurrence", func() {
@@ -203,6 +204,24 @@ var _ = Describe("listener", func() {
 					Expect(scanEndOccurrence.NoteName).To(Equal(expectedNoteName))
 					Expect(scanEndOccurrence.Details.(*grafeas_go_proto.Occurrence_Discovered).Discovered.Discovered.AnalysisStatus).To(Equal(discovery_go_proto.Discovered_FINISHED_FAILED))
 					Expect(scanEndOccurrence.Resource.Uri).To(Equal(fmt.Sprintf("%s@%s", expectedResourceUriPrefix, expectedRevision)))
+				})
+			})
+
+			When("an unexpected payload is received from sonar", func() {
+				BeforeEach(func() {
+					expectedSonarEvent.QualityGate = nil
+				})
+
+				It("should respond with a 500", func() {
+					Expect(recorder.Code).To(Equal(http.StatusInternalServerError))
+				})
+
+				It("should not create a note", func() {
+					Expect(rodeClient.CreateNoteCallCount()).To(Equal(0))
+				})
+
+				It("should not create occurrences", func() {
+					Expect(rodeClient.BatchCreateOccurrencesCallCount()).To(Equal(0))
 				})
 			})
 
